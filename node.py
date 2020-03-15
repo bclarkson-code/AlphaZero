@@ -9,18 +9,17 @@ class Node(object):
     As a convention, Machine goes first and has ID 1, human has id -1
     '''
 
-    def __init__(self, board, player, parent=None):
-        self.board = board
-        self.player = player
-        self.children = []
+    def __init__(self, board, parent=None, prior=0):
+        self.to_play = 1
+        self.prior = prior
+        self.children = {}
         self.winner = np.nan
         self.end_state = np.nan
         self.wins = 0
         self.visits = 0
         self.UCB = np.inf
         self.parent = parent
-        self.expanded = False
-        self.hash = str(self.board)
+        self.board = board
 
     def score(self):
         '''
@@ -28,7 +27,7 @@ class Node(object):
         '''
         if self.visits == 0:
             return 0
-        return (1 + (self.wins / self.visits)) * 0.5
+        return self.wins / self.visits
 
     def expanded(self):
         '''

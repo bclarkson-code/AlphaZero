@@ -4,7 +4,7 @@ import sys
 import numba
 import re
 import pyximport
-pyximport.install()
+pyximport.install(language_level=2)
 from c_draughts import C_Draughts
 
 
@@ -252,27 +252,32 @@ class Draughts(object):
     def __init__(self):
         self.c_logic = C_Draughts()
 
-    def moves(self, in_board, to_move):
-        boards, number_of_boards = self.c_logic.get_moves(in_board, to_move)
+    def moves(self, in_board, to_move, only_jumps=False):
+        if self.winner(in_board) != None:
+            return []
+        boards, number_of_boards = self.c_logic.get_moves(
+            in_board, to_move, only_jumps=only_jumps)
         out_boards = []
+        if number_of_boards == 0 and only_jumps:
+            return []
         for i in range(number_of_boards):
             out_board = DraughtsBoard(boards[i])
-            out_board.moves_since_start = in_board.moves_since_start
-            out_board.moves_since_capture = in_board.moves_since_capture
-            out_board.moves_since_king = in_board.moves_since_king
+            out_board.moves_since_start = in_board.moves_since_start + 1
+            out_board.winner = in_board.winner
             out_boards.append(out_board)
+        if not out_boards:
+            in_board.winner = to_move * -1
+            return in_board
         return out_boards
 
     def next_player(self, player):
         return player * -1
 
     def winner(self, board):
-        if board.moves_since_king > 80:
+        if board.moves_since_start > 256:
             return 0
-        elif board.moves_since_capture > 80:
-            return 0
-        elif board.moves_since_start > 512:
-            return 0
+        elif board.winner:
+            return board.winner
         else:
             return self.c_logic.get_winner(board)
 
@@ -375,10 +380,11 @@ class Draughts(object):
 class DraughtsBoard(np.ndarray):
     """
     Modify the standard numpy array to contain some new, draughts
-    specific, sattributes:
+    specific, attributes:
      - moves since start
      - moves since capture
      - moves since king
+     - if a given player has won the game
      - history of the last 8 board states
     """
 
@@ -387,8 +393,7 @@ class DraughtsBoard(np.ndarray):
         obj = np.asarray(input_array).view(cls)
         # add the new attributes to the created instance
         obj.moves_since_start = 0
-        obj.moves_since_capture = 0
-        obj.moves_since_king = 0
+        obj.winner = 0
         # Finally, return the newly created object:
         return obj
 
@@ -396,5 +401,4 @@ class DraughtsBoard(np.ndarray):
         if obj is None: return
         # Add the extra attributes to the object
         self.moves_since_start = getattr(obj, 'moves_since_start', None)
-        self.moves_since_capture = getattr(obj, 'moves_since_capture', None)
-        self.moves_since_king = getattr(obj, 'moves_since_king', None)
+        self.winner = getattr(obj, 'winner', None)
