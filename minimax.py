@@ -1,3 +1,7 @@
+import numpy as np
+import math
+
+
 class TicTacToe(object):
     """
     A class of functions that can be used to generate next moves from a node and test for a win.
@@ -124,6 +128,7 @@ class Node(object):
 
 def minimax(node, maximising_player):
     global visited
+    global rules
     visited[node.board.__str__()] = node.board
 
     if node.is_terminal:
@@ -147,7 +152,10 @@ def minimax(node, maximising_player):
 
 if __name__ == '__main__':
     global visited
+    global rules
     visited = {}  # store board states in a hash table to avoid repeats
+    rules = TicTacToe()
+
     start_state = np.zeros((3, 3))
     root = Node(start_state)
     score = minimax(root, -1)
