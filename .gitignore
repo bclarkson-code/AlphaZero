@@ -1,0 +1,7 @@
+.venv*
+*__pycache__*
+build*
+*.c
+*.so
+launch.json
+*.vscode

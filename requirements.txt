@@ -1,0 +1,5 @@
+numpy
+tensorflow
+cython
+black
+numba

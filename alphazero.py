@@ -17,7 +17,7 @@ import os
 
 
 class AlphaZeroConfig(object):
-    '''Configuration settings'''
+    """Configuration settings"""
 
     def __init__(self):
         ### Self-Play
@@ -45,7 +45,6 @@ class AlphaZeroConfig(object):
 
         self.weight_decay = 1e-4
         self.momentum = 0.9
-        # Schedule for chess and shogi, Go starts at 2e-2 immediately.
         self.learning_rate = 2e-2
         self.cores = cpu_count()
         self.job_size = 128
@@ -84,7 +83,7 @@ class Game(object):
         return self.logic.winner(self.history[-1])
 
     def xy_to_board(self, move):
-        '''Convert a set of move coords to a board'''
+        """Convert a set of move coords to a board"""
         moves_since_start = self.board.moves_since_start + 1
         board = self.board.copy()
         while move:
@@ -96,8 +95,10 @@ class Game(object):
             elif end_y == 0 and self.to_play == board[start_y][start_x] == 1:
                 board[start_y][start_x], board[end_y][end_x] = 0, 2
             else:
-                board[start_y][start_x], board[end_y][end_x] = 0, board[
-                    start_y][start_x]
+                board[start_y][start_x], board[end_y][end_x] = (
+                    0,
+                    board[start_y][start_x],
+                )
 
             # check if jump performed
             if abs(start_x - end_x) == 2 and abs(start_y - end_y) == 2:
@@ -113,7 +114,7 @@ class Game(object):
         return abs(start_x - end_x) == 2 and abs(start_y - end_y) == 2
 
     def board_to_xy(self, out_board, in_board):
-        '''Convert a board into a set of move coords'''
+        """Convert a board into a set of move coords"""
         now_zero = (out_board == 0) & (in_board != 0)
         was_zero = (out_board != 0) & (in_board == 0)
 
@@ -131,14 +132,12 @@ class Game(object):
         return start_x, start_y, end_x, end_y
 
     def raw_to_xy(self, start_loc):
-        '''Convert a flattened index to an x,y index'''
+        """Convert a flattened index to an x,y index"""
         return start_loc % 8, start_loc // 8
 
     def legal_actions(self, as_xy=True, only_jumps=False):
-        '''Generate all of the legal moves from the current state'''
-        moves = self.logic.moves(self.board,
-                                 self.to_play,
-                                 only_jumps=only_jumps)
+        """Generate all of the legal moves from the current state"""
+        moves = self.logic.moves(self.board, self.to_play, only_jumps=only_jumps)
         if as_xy:
             try:
                 return [self.board_to_xy(move, self.board) for move in moves]
@@ -150,10 +149,12 @@ class Game(object):
             return moves
 
     def clone(self):
-        return Game(history=copy(self.history),
-                    board=copy(self.board),
-                    to_play=copy(self.to_play),
-                    logic=copy(self.logic))
+        return Game(
+            history=copy(self.history),
+            board=copy(self.board),
+            to_play=copy(self.to_play),
+            logic=copy(self.logic),
+        )
 
     def apply(self, action, change_player=True):
         if type(action) is tuple:
@@ -175,9 +176,10 @@ class Game(object):
         self.child_visits.append(child_visits)
 
     def binarize(self, image, to_play):
-        '''Convert the current state into a series of binary feature planes'''
+        """Convert the current state into a series of binary feature planes"""
         features = np.zeros(
-            (self.width, self.width, self.history_len * self.planes_per_board))
+            (self.width, self.width, self.history_len * self.planes_per_board)
+        )
 
         for i, board in enumerate(image):
             index = i * self.planes_per_board
@@ -185,19 +187,19 @@ class Game(object):
             features[:, :, index + 1] = board == 1  # white_pawn
             features[:, :, index + 2] = board == -2  # black_king
             features[:, :, index + 3] = board == 2  # white_king
-            features[:, :, index + 4] = np.full(fill_value=to_play * (-1**i),
-                                                shape=(self.width,
-                                                       self.width))  # colour
+            features[:, :, index + 4] = np.full(
+                fill_value=to_play * (-(1**i)), shape=(self.width, self.width)
+            )  # colour
             features[:, :, index + 5] = np.full(
-                fill_value=board.moves_since_start,
-                shape=(self.width, self.width))  # total_moves
+                fill_value=board.moves_since_start, shape=(self.width, self.width)
+            )  # total_moves
 
         return [features]  # Need to wrap in a list because the NN expects
         # several inputs
 
     def make_image(self, state_index):
-        '''Convert a historical state into a series of binary feature planes'''
-        image = self.history[-self.history_len + state_index:state_index]
+        """Convert a historical state into a series of binary feature planes"""
+        image = self.history[-self.history_len + state_index : state_index]
         if np.count_nonzero(image) == 0:
             return None
         return self.binarize(image, self.to_play)
@@ -211,17 +213,17 @@ class Game(object):
 
 class ReplayBuffer(object):
     def __init__(self, config):
-        self.filename = 'games_{}.pickle'.format(time.time())
+        self.filename = "games_{}.pickle".format(time.time())
         self.window_size = config.window_size
         self.batch_size = config.batch_size
         self.buffer = self.import_games()
 
     def import_games(self):
-        '''Returns the latest batch of saved games'''
-        games = [(float(f[6:-7]), f) for f in os.listdir() if 'games_' in f]
+        """Returns the latest batch of saved games"""
+        games = [(float(f[6:-7]), f) for f in os.listdir() if "games_" in f]
         if games:
             _, filename = max(games)
-            with open(filename, 'rb') as f:
+            with open(filename, "rb") as f:
                 games = pickle.loads(f.read())
 
             for game_index, game in enumerate(games):
@@ -244,7 +246,7 @@ class ReplayBuffer(object):
             self.buffer.pop(0)
         self.buffer.append(game)
         buffer_str = pickle.dumps(self.buffer)
-        with open(self.filename, 'wb') as f:
+        with open(self.filename, "wb") as f:
             f.write(buffer_str)
 
     def sample_batch(self):
@@ -271,22 +273,23 @@ class ReplayBuffer(object):
 class SharedStorage(object):
     def __init__(self):
         self._networks = []
-        self.filename = 'networks_{}.pickle'.format(time.time())
+        self.filename = "networks_{}.pickle".format(time.time())
 
-    def latest_network(self, ):
+    def latest_network(
+        self,
+    ):
         if self._networks:
             return self._networks[-1]
         else:
             network = Network()
-            checkpoints = [(float(f[8:-5]), f) for f in os.listdir()
-                           if '.ckpt' in f]
+            checkpoints = [(float(f[8:-5]), f) for f in os.listdir() if ".ckpt" in f]
             _, latest = max(checkpoints)
             network.model.load_weights(latest)
             return network
 
     def save_network(self, network):
         self._networks.append(network)
-        network.model.save_weights('network_{}.ckpt'.format(time.time()))
+        network.model.save_weights("network_{}.ckpt".format(time.time()))
 
 
 # AlphaZero training is split into two independent parts: Network training and
@@ -298,11 +301,8 @@ def alphazero(config):
     storage = SharedStorage()
     replay_buffer = ReplayBuffer(config)
     storage, _ = train_network(config, storage, replay_buffer)
-    os.system('clear')
-    for i in tqdm(range(config.training_steps),
-                  desc='Main',
-                  ascii=True,
-                  position=0):
+    os.system("clear")
+    for i in tqdm(range(config.training_steps), desc="Main", ascii=True, position=0):
 
         _, storage = launch_job(run_selfplay, config, storage, replay_buffer)
 
@@ -321,8 +321,7 @@ def launch_job(function, config, storage, replay_buffer):
 # snapshot, produces a game and makes it available to the training job by
 # writing it to a shared replay buffer.
 def run_selfplay(config, storage, replay_buffer):
-    for i in tqdm(range(config.job_size), desc='Games', ascii=True,
-                  position=1):
+    for i in tqdm(range(config.job_size), desc="Games", ascii=True, position=1):
         network = storage.latest_network()
         game = play_game(config, network)
         replay_buffer.save_game(game)
@@ -334,8 +333,7 @@ def run_selfplay(config, storage, replay_buffer):
 # of the game is reached.
 def play_game(config, network):
     game = Game()
-    with tqdm(total=config.max_moves, desc='Moves', ascii=True,
-              position=2) as pbar:
+    with tqdm(total=config.max_moves, desc="Moves", ascii=True, position=2) as pbar:
         while not game.terminal() and len(game.history) < config.max_moves:
             action, root = run_mcts(config, game, network)
             game.apply(action)
@@ -403,8 +401,10 @@ def select_child(config, node):
 # The score for a node is based on its value, plus an exploration bonus based on
 # the prior.
 def ucb_score(config, parent, child):
-    pb_c = math.log((parent.visits + config.pb_c_base + 1) /
-                    config.pb_c_base) + config.pb_c_init
+    pb_c = (
+        math.log((parent.visits + config.pb_c_base + 1) / config.pb_c_base)
+        + config.pb_c_init
+    )
     pb_c *= math.sqrt(parent.visits) / (child.visits + 1)
 
     prior_score = pb_c * child.prior
@@ -433,15 +433,15 @@ def generate_jumps(policy, scratch_game, network):
 
 
 def flatten(dictionary, parent_key=(), parent_prob=1):
-    '''Flatten the nested probability dictionary'''
+    """Flatten the nested probability dictionary"""
     items = []
     for key, value in dictionary.items():
         if type(value) is tuple:
             new_key = parent_key + key
             new_prob = parent_prob * value[1]
             items.extend(
-                flatten(value[0], parent_key=new_key,
-                        parent_prob=new_prob).items())
+                flatten(value[0], parent_key=new_key, parent_prob=new_prob).items()
+            )
         else:
             new_key = parent_key + key
             items.append((new_key, value * parent_prob))
@@ -483,8 +483,9 @@ def add_exploration_noise(config, node):
     noise = np.random.gamma(config.root_dirichlet_alpha, 1, len(actions))
     frac = config.root_exploration_fraction
     for action, noise in zip(actions, noise):
-        node.children[action].prior = node.children[action].prior * (
-            1 - frac) + noise * frac
+        node.children[action].prior = (
+            node.children[action].prior * (1 - frac) + noise * frac
+        )
     return node
 
 
@@ -500,8 +501,9 @@ def train_network(config, storage, replay_buffer, return_network=False):
     optimiser = keras.optimizers.SGD(config.learning_rate)
     images, target_policies, target_values = replay_buffer.sample_batch()
 
-    network, history = update_weights(optimiser, network, images,
-                                      target_policies, target_values, config)
+    network, history = update_weights(
+        optimiser, network, images, target_policies, target_values, config
+    )
     storage.save_network(network)
     if return_network:
         return network
@@ -515,22 +517,22 @@ def cross_entropy_with_logits(y_true, y_pred):
     return loss
 
 
-def update_weights(optimiser, network, images, target_policies, target_values,
-                   config):
-    network.model.compile(optimizer=optimiser,
-                          loss={
-                              'value': 'mean_squared_error',
-                              'policy': cross_entropy_with_logits
-                          })
-    history = network.model.fit(images, {
-        'value': target_values,
-        'policy': target_policies
-    },
-                                epochs=config.epochs)
+def update_weights(optimiser, network, images, target_policies, target_values, config):
+    print(network.model.summary())
+    network.model.compile(
+        optimizer=optimiser,
+        loss={"value": "mean_squared_error", "policy": cross_entropy_with_logits},
+        run_eagerly=True
+    )
+    history = network.model.fit(
+        images,
+        {"value": target_values, "policy": target_policies},
+        epochs=config.epochs,
+    )
 
     return network, history
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     config = AlphaZeroConfig()
     alphazero(config)

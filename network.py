@@ -1,8 +1,6 @@
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
 from keras.models import Model
-from keras.layers.normalization import BatchNormalization
+from keras.layers import BatchNormalization
 from keras.layers.convolutional import Conv2D
 from keras.layers.core import Dense
 from keras.layers import Flatten
@@ -35,9 +33,7 @@ class Network(object):
         self.regularisation = 0.01
         self.crossentropy_constant = 1e-8
         self.model = self.make_uniform()
-        self.policy_keys = [
-            self.index_to_xy(index) for index in range(self.n_actions)
-        ]
+        self.policy_keys = [self.index_to_xy(index) for index in range(self.n_actions)]
 
         # self.input_queue = Queue()
         # self.output_queue = Queue()
@@ -45,10 +41,10 @@ class Network(object):
         # thread.start()
 
     def index_to_xy(self, index):
-        '''Convert an output index into a set of move coords.
-           This is done by converting the index into octal, taking the first
-           2 digits as the start position and the
-           final digit as a direction and distance'''
+        """Convert an output index into a set of move coords.
+        This is done by converting the index into octal, taking the first
+        2 digits as the start position and the
+        final digit as a direction and distance"""
         directions = {0: (-1, -1), 1: (1, -1), 2: (-1, 1), 3: (1, 1)}
         move = index % 8
         index -= move
@@ -77,45 +73,46 @@ class Network(object):
 
         direction = directions[vector]
         index = start_x * 64 + start_y * 8 + distance * 4 + direction
+        return index
 
     def output_features(self, in_board, output, to_move):
-        '''Convert the policy output plane from the neural network into a board
-            state. Output plane is a 64 * 63 = 992 vector corresponding to moving a
-            piece from any valid square to any other valid square
+        """Convert the policy output plane from the neural network into a board
+        state. Output plane is a 64 * 63 = 992 vector corresponding to moving a
+        piece from any valid square to any other valid square
 
-            Each position from 0 to 31 corresponds to a position on the following
-            board:
-            |  |0 |  |1 |  |2 |  |3 |
-            |4 |  |5 |  |6 |  |7 |  |
-            |  |8 |  |9 |  |10|  |11|
-            |12|  |13|  |14|  |15|  |
-            |  |16|  |17|  |18|  |19|
-            |20|  |21|  |22|  |23|  |
-            |  |24|  |25|  |26|  |27|
-            |28|  |29|  |30|  |31|  |
+        Each position from 0 to 31 corresponds to a position on the following
+        board:
+        |  |0 |  |1 |  |2 |  |3 |
+        |4 |  |5 |  |6 |  |7 |  |
+        |  |8 |  |9 |  |10|  |11|
+        |12|  |13|  |14|  |15|  |
+        |  |16|  |17|  |18|  |19|
+        |20|  |21|  |22|  |23|  |
+        |  |24|  |25|  |26|  |27|
+        |28|  |29|  |30|  |31|  |
 
-            An index in the output vector corresponds to:
-                start_index + 32 * end_index
-            Thus, the mapping from index to start_index, end_index is as
-            follows:
-                start_index = index % 32
-                end_index = index // 32
-            The mapping from a board_index to x, y is as follows:
-                y = index // 4
-                x = (2 * index) % 8 + y % 2
-            As a piece cannot move onto itself:
-            if end_index >= start_index:
-                end_index += 1
-            '''
+        An index in the output vector corresponds to:
+            start_index + 32 * end_index
+        Thus, the mapping from index to start_index, end_index is as
+        follows:
+            start_index = index % 32
+            end_index = index // 32
+        The mapping from a board_index to x, y is as follows:
+            y = index // 4
+            x = (2 * index) % 8 + y % 2
+        As a piece cannot move onto itself:
+        if end_index >= start_index:
+            end_index += 1
+        """
 
         def raw_to_xy(raw):
-            '''Converts a raw, unraveled numpy index into an x,y coord'''
+            """Converts a raw, unraveled numpy index into an x,y coord"""
             x = raw % 8
             y = raw // 8
             return x, y
 
         def board_to_xy(board, in_board, to_move):
-            '''Convert a board into a set of move coords'''
+            """Convert a board into a set of move coords"""
             diff = np.sign(board - in_board)
             start_loc = diff.argmin()
             start_x, start_y = raw_to_xy(start_loc)
@@ -125,15 +122,13 @@ class Network(object):
             return start_x, start_y, end_x, end_y
 
         moves = self.game_logic.moves(in_board, to_move)
-        legal_move_coords = [
-            board_to_xy(move, in_board, to_move) for move in moves
-        ]
+        legal_move_coords = [board_to_xy(move, in_board, to_move) for move in moves]
         index = np.argmax(output)
-        out_move_coords = index_to_xy(index)
+        out_move_coords = self.index_to_xy(index)
         while out_move_coords not in legal_move_coords:
             output[index] = 0
             index = output.argmax()
-            out_move_coords = index_to_xy(index)
+            out_move_coords = self.index_to_xy(index)
 
         start_x, start_y, end_x, end_y = out_move_coords
         new_board = in_board.copy()
@@ -142,106 +137,120 @@ class Network(object):
         return new_board
 
     def conv_block(self, in_layer):
-        '''
+        """
         Build a convolutional block of network layers
-        '''
-        layer = Conv2D(self.n_kernels,
-                       self.kernel_size,
-                       padding='same',
-                       kernel_initializer=self.initialiser,
-                       kernel_regularizer=l2(self.regularisation),
-                       bias_regularizer=l2(self.regularisation))(in_layer)
+        """
+        layer = Conv2D(
+            self.n_kernels,
+            self.kernel_size,
+            padding="same",
+            kernel_initializer=self.initialiser,
+            kernel_regularizer=l2(self.regularisation),
+            bias_regularizer=l2(self.regularisation),
+        )(in_layer)
         layer = BatchNormalization()(layer)
         return ReLU()(layer)
 
     def resid_block(self, in_layer):
-        '''
+        """
         Build a residual block of network layers
-        '''
+        """
         layer = self.conv_block(in_layer)
-        layer = Conv2D(self.n_kernels,
-                       self.kernel_size,
-                       padding='same',
-                       kernel_initializer=self.initialiser,
-                       kernel_regularizer=l2(self.regularisation),
-                       bias_regularizer=l2(self.regularisation))(in_layer)
+        layer = Conv2D(
+            self.n_kernels,
+            self.kernel_size,
+            padding="same",
+            kernel_initializer=self.initialiser,
+            kernel_regularizer=l2(self.regularisation),
+            bias_regularizer=l2(self.regularisation),
+        )(in_layer)
         layer = BatchNormalization()(layer)
         return Add()([layer, in_layer])
 
     def build_shared(self):
-        '''
+        """
         Build the shared residual stack
-        '''
-        self.inputs = Input(shape=(self.width, self.width,
-                                   self.planes_per_board * self.history_len))
+        """
+        self.inputs = Input(
+            shape=(self.width, self.width, self.planes_per_board * self.history_len)
+        )
         shared = self.conv_block(self.inputs)
-        for layer_num in range(self.shared_layers):
+        for _ in range(self.shared_layers):
             shared = self.resid_block(shared)
         return shared
 
     def build_policy(self, shared):
-        '''
+        """
         Add the policy head onto the shared residual stack
-        '''
-        layer = Conv2D(self.n_kernels,
-                       self.kernel_size,
-                       padding='same',
-                       kernel_initializer=self.initialiser,
-                       kernel_regularizer=l2(self.regularisation),
-                       bias_regularizer=l2(self.regularisation))(shared)
+        """
+        layer = Conv2D(
+            self.n_kernels,
+            self.kernel_size,
+            padding="same",
+            kernel_initializer=self.initialiser,
+            kernel_regularizer=l2(self.regularisation),
+            bias_regularizer=l2(self.regularisation),
+        )(shared)
         layer = BatchNormalization()(layer)
         layer = ReLU()(layer)
         layer = Flatten()(layer)
-        layer = Dense(self.n_actions,
-                      activation='softmax',
-                      kernel_regularizer=l2(self.regularisation),
-                      bias_regularizer=l2(self.regularisation))(layer)
+        layer = Dense(
+            self.n_actions,
+            activation="softmax",
+            kernel_regularizer=l2(self.regularisation),
+            bias_regularizer=l2(self.regularisation),
+        )(layer)
         return Lambda(
             lambda x: x + self.crossentropy_constant,
-            name='policy',
+            name="policy",
         )(layer)
 
     def build_value(self, shared):
-        '''
+        """
         Add the value head onto the shared residual stack
-        '''
-        layer = Conv2D(self.n_kernels,
-                       self.kernel_size,
-                       padding='same',
-                       kernel_initializer=self.initialiser,
-                       kernel_regularizer=l2(self.regularisation),
-                       bias_regularizer=l2(self.regularisation))(shared)
+        """
+        layer = Conv2D(
+            self.n_kernels,
+            self.kernel_size,
+            padding="same",
+            kernel_initializer=self.initialiser,
+            kernel_regularizer=l2(self.regularisation),
+            bias_regularizer=l2(self.regularisation),
+        )(shared)
         layer = BatchNormalization()(layer)
         layer = ReLU()(layer)
         layer = Flatten()(layer)
-        layer = Dense(self.n_kernels,
-                      kernel_regularizer=l2(self.regularisation),
-                      bias_regularizer=l2(self.regularisation))(layer)
-        return Dense(1,
-                     activation='tanh',
-                     name='value',
-                     kernel_initializer=self.initialiser,
-                     kernel_regularizer=l2(self.regularisation),
-                     bias_regularizer=l2(self.regularisation))(layer)
+        layer = Dense(
+            self.n_kernels,
+            kernel_regularizer=l2(self.regularisation),
+            bias_regularizer=l2(self.regularisation),
+        )(layer)
+        return Dense(
+            1,
+            activation="tanh",
+            name="value",
+            kernel_initializer=self.initialiser,
+            kernel_regularizer=l2(self.regularisation),
+            bias_regularizer=l2(self.regularisation),
+        )(layer)
 
     def make_uniform(self):
-        '''
+        """
         Actaully build the network with uniform outputs
-        '''
+        """
         self.shared = self.build_shared()
         self.policy = self.build_policy(self.shared)
         self.value = self.build_value(self.shared)
-        self.model = Model(inputs=self.inputs,
-                           outputs=[self.policy, self.value])
-        self.model._make_predict_function()
+        self.model = Model(inputs=self.inputs, outputs=[self.policy, self.value])
+        self.model.make_predict_function()
         return self.model
 
     def inference(self, image, as_dict=True):
-        '''
+        """
         Given a board state, predict the probability of the current player
         winning (value) and the probability that each of the next moves will
         result in a win (policy)
-        '''
+        """
         pred = self.model.predict([image])
 
         policy = pred[0][0]
@@ -287,14 +296,14 @@ class Network(object):
     #             self.output_queue.put(inference)
 
     def get_weights(self):
-        '''
+        """
         Return a list of the weights of both the value model and the policy
         model
-        '''
+        """
         return self.model.get_weights()
 
     def set_weights(self, weights):
-        '''
+        """
         Set the weights of the network
-        '''
+        """
         self.model.set_weights(weights)

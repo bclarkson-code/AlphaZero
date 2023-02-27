@@ -1,0 +1,14 @@
+name: tf-metal
+channels:
+  - apple
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - tensorflow-deps
+  - numba
+  - cython
+  - tqdm
+  - pip:
+    - tensorflow-macos
+    - tensorflow-metal  
